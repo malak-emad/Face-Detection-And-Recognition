@@ -66,9 +66,12 @@ class MainApp(QtWidgets.QMainWindow, ui):
         rectangle_tickness = int(self.tickness_lineEdit.text())
         scale_factor = float(self.scaleFactor_lineEdit.text())
         window_size = int(self.windowSize_lineEdit.text())
-        
+        start = time.time()
         faces, detected_faces = FaceDetection.detect_faces(self.img_array, rectangle_tickness, scale_factor, window_size)
+        end = time.time()
         self.display_result_on_label(self.outputDetection, detected_faces)
+        elapsed_ms = (end - start) * 1000  # Convert to milliseconds
+        self.detectionTime_label.setText(f"{elapsed_ms:.2f} ms")
 
 
     def display_result_on_label(self, label: QLabel, image: np.ndarray):
