@@ -8,9 +8,7 @@ class FaceDetection:
 
     def detect_faces(src: np.ndarray, rectangle_thickness: int = 10, scale_factor: float = 1.1, min_size: int = 50):
         
-        ## Detect faces in an image using Haar cascades.
-        
-
+        ##detect faces in an image using Haar cascades.
         image = np.copy(src)
 
         if len(image.shape) > 2:
@@ -33,9 +31,7 @@ class FaceDetection:
 
     def draw_faces(src: np.ndarray, faces: list, thickness: int = 10):
         
-        ## Draw rectangles around detected faces.
-        
-
+        ##draw rectangles around detected faces.
         img = np.copy(src)
 
         for (x, y, w, h) in faces:
