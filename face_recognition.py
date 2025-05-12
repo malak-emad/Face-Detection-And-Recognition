@@ -3,6 +3,9 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
+from sklearn.metrics import confusion_matrix, roc_curve, auc
+from sklearn.preprocessing import label_binarize
+from itertools import cycle
 
 import numpy as np
 
@@ -246,3 +249,216 @@ class FaceRecognition:
         
         plt.tight_layout()
         plt.show()
+
+    
+    def generate_confusion_matrix(self, test_data_folder=None):
+        """
+        Generate and display a confusion matrix from test data folder.
+        
+        Args:
+            test_data_folder (str, optional): Path to folder containing test subject folders.
+                                            If None, will use the test folder from the current directory structure.
+        """
+        if test_data_folder is None:
+            # Try to find the test folder in the current directory structure
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            # Look for standard test data path
+            possible_test_paths = [
+                os.path.join(current_dir, 'dataset', 'MIT-CBCL-facerec-database', 'SOME DATA', 'test'),
+                os.path.join(current_dir, 'test')
+            ]
+            
+            for path in possible_test_paths:
+                if os.path.exists(path) and os.path.isdir(path):
+                    test_data_folder = path
+                    break
+                    
+            if test_data_folder is None:
+                print("Error: Could not find test data folder")
+                return None, None
+        
+        y_true = []  # True labels
+        y_pred = []  # Predicted labels
+        
+        # Process each subject folder in the test directory
+        for subject_dir in os.listdir(test_data_folder):
+            subject_path = os.path.join(test_data_folder, subject_dir)
+            
+            # Skip if not a directory
+            if not os.path.isdir(subject_path):
+                continue
+                
+            # Process each image in the subject folder
+            image_files = [f for f in os.listdir(subject_path) 
+                        if f.lower().endswith(('.pgm', '.jpg', '.jpeg', '.png'))]
+            
+            for img_file in image_files:
+                # Use the folder name as the true label
+                true_label = subject_dir
+                
+                img_path = os.path.join(subject_path, img_file)
+                img = cv2.imread(img_path)
+                
+                if img is None:
+                    continue
+                    
+                y_true.append(true_label)
+                
+                # Get prediction for this image
+                _, results, _ = self.recognize_face(img)
+                
+                if results:
+                    pred_label_num = results[0][0]  # Get first result's label
+                    # Map the numeric label to the subject folder name
+                    pred_subject = self.subject_names.get(pred_label_num, "Unknown")
+                    y_pred.append(pred_subject)
+                else:
+                    y_pred.append("Unknown")
+        
+        # Get all unique sorted labels
+        all_labels = sorted(list(set(y_true + y_pred)))
+        
+        # Generate confusion matrix
+        cm = confusion_matrix(y_true, y_pred, labels=all_labels)
+        
+        # Create and display the confusion matrix plot
+        fig, ax = plt.subplots(figsize=(10, 8))
+        im = ax.imshow(cm, cmap='Blues')
+        
+        # Set labels
+        ax.set_xticks(np.arange(len(all_labels)))
+        ax.set_yticks(np.arange(len(all_labels)))
+        ax.set_xticklabels(all_labels, rotation=45, ha="right")
+        ax.set_yticklabels(all_labels)
+        ax.set_xlabel('Predicted Label')
+        ax.set_ylabel('True Label')
+        
+        # Add text annotations
+        for i in range(len(all_labels)):
+            for j in range(len(all_labels)):
+                ax.text(j, i, cm[i, j], 
+                    ha="center", va="center",
+                    color="white" if cm[i, j] > cm.max()/2 else "black")
+        
+        plt.title('Confusion Matrix')
+        plt.tight_layout()
+        plt.show()
+        
+        return cm, all_labels
+
+    def generate_roc_curve(self, test_data_folder=None):
+        """
+        Generate and display ROC curves for face recognition performance.
+        
+        Args:
+            test_data_folder (str, optional): Path to folder containing test subject folders.
+                                            If None, will use the test folder from the current directory structure.
+        """
+        if test_data_folder is None:
+            # Try to find the test folder in the current directory structure
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            # Look for standard test data path
+            possible_test_paths = [
+                os.path.join(current_dir, 'dataset', 'MIT-CBCL-facerec-database', 'SOME DATA', 'test'),
+                os.path.join(current_dir, 'test')
+            ]
+            
+            for path in possible_test_paths:
+                if os.path.exists(path) and os.path.isdir(path):
+                    test_data_folder = path
+                    break
+                    
+            if test_data_folder is None:
+                print("Error: Could not find test data folder")
+                return None, None, None
+        
+        # Collect all test images and true labels
+        test_images = []
+        y_true = []
+        
+        # Process each subject directory in the test folder
+        for subject_dir in os.listdir(test_data_folder):
+            subject_path = os.path.join(test_data_folder, subject_dir)
+            
+            # Skip if not a directory
+            if not os.path.isdir(subject_path):
+                continue
+                
+            # Process each image in the subject's folder
+            image_files = [f for f in os.listdir(subject_path) 
+                        if f.lower().endswith(('.pgm', '.jpg', '.jpeg', '.png'))]
+                        
+            for img_file in image_files:
+                img_path = os.path.join(subject_path, img_file)
+                img = cv2.imread(img_path)
+                
+                if img is None:
+                    continue
+                    
+                # Store image and its true label (folder name)
+                test_images.append(img)
+                y_true.append(subject_dir)
+        
+        # Get unique classes
+        classes = sorted(list(set(y_true)))
+        n_classes = len(classes)
+        
+        # Binarize the labels (one-vs-rest)
+        y_true_bin = label_binarize(y_true, classes=classes)
+        
+        # Initialize array for decision scores
+        decision_scores = np.zeros((len(test_images), n_classes))
+        
+        # For each test image, get confidence scores for all classes
+        for i, image in enumerate(test_images):
+            # Get prediction for this image
+            _, results, _ = self.recognize_face(image)
+            
+            if results:
+                pred_label_num, confidence = results[0]
+                pred_subject = self.subject_names.get(pred_label_num, "Unknown")
+                
+                # Find index of predicted class in classes list
+                if pred_subject in classes:
+                    class_idx = classes.index(pred_subject)
+                    decision_scores[i, class_idx] = confidence
+        
+        # Compute ROC curve and ROC area for each class
+        fpr = dict()
+        tpr = dict()
+        roc_auc = dict()
+        
+        for i in range(n_classes):
+            fpr[i], tpr[i], _ = roc_curve(y_true_bin[:, i], decision_scores[:, i])
+            roc_auc[i] = auc(fpr[i], tpr[i])
+        
+        # Compute micro-average ROC curve and area
+        fpr["micro"], tpr["micro"], _ = roc_curve(y_true_bin.ravel(), decision_scores.ravel())
+        roc_auc["micro"] = auc(fpr["micro"], tpr["micro"])
+        
+        # Plot ROC curves
+        plt.figure(figsize=(10, 8))
+        
+        # Plot each class
+        colors = cycle(['aqua', 'darkorange', 'cornflowerblue', 'green', 'red',
+                    'purple', 'pink', 'brown', 'gray', 'olive'])
+        for i, color in zip(range(n_classes), colors):
+            plt.plot(fpr[i], tpr[i], color=color, lw=2,
+                    label=f'Class {classes[i]} (AUC = {roc_auc[i]:0.2f})')
+        
+        # Plot micro-average
+        plt.plot(fpr["micro"], tpr["micro"],
+                label=f'Micro-average (AUC = {roc_auc["micro"]:0.2f})',
+                color='deeppink', linestyle=':', linewidth=4)
+        
+        plt.plot([0, 1], [0, 1], 'k--', lw=2)
+        plt.xlim([0.0, 1.0])
+        plt.ylim([0.0, 1.05])
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+        plt.title('ROC Curve for Face Recognition')
+        plt.legend(loc="lower right")
+        plt.grid(True)
+        plt.show()
+        
+        return fpr, tpr, roc_auc

@@ -38,6 +38,8 @@ class MainApp(QtWidgets.QMainWindow, ui):
         self.uploadImage2_button.clicked.connect(self.make_eigen_faces)
         self.pushButton.clicked.connect(self.load_single_test_image)
         self.applyMethods_button.clicked.connect(self.match_faces)
+        self.rocCurve_button.clicked.connect(self.draw_roc_curve)
+        self.confusionMatrix_button.clicked.connect(self.draw_confusion_matrix)
         
         self.statusBar().showMessage("Ready")
 
@@ -219,6 +221,44 @@ class MainApp(QtWidgets.QMainWindow, ui):
                 QMessageBox.information(self, "Recognition Results", result_text)
         else:
             QMessageBox.warning(self, "Warning", "No faces detected in the test image")
+
+    def draw_confusion_matrix(self):
+        """
+        Handle confusion matrix button click.
+        Automatically uses the test folder path from the current project structure
+        to generate and display the confusion matrix.
+        """
+        self.statusBar().showMessage("Generating confusion matrix...")
+        try:
+            # Call the updated function without specifying a folder path
+            # It will auto-detect the test data folder
+            cm, labels = self.face_recognition.generate_confusion_matrix()
+            if cm is not None:
+                self.statusBar().showMessage(f"Confusion matrix generated with {len(labels)} classes")
+            else:
+                self.statusBar().showMessage("Failed to generate confusion matrix: Test folder not found")
+        except Exception as e:
+            QMessageBox.warning(self, "Error", f"Failed to generate confusion matrix: {str(e)}")
+            self.statusBar().showMessage("Error generating confusion matrix")
+
+    def draw_roc_curve(self):
+        """
+        Handle ROC curve button click.
+        Automatically uses the test folder path from the current project structure
+        to generate and display ROC curves.
+        """
+        self.statusBar().showMessage("Generating ROC curve...")
+        try:
+            # Call the updated function without specifying a folder path
+            # It will auto-detect the test data folder
+            fpr, tpr, roc_auc = self.face_recognition.generate_roc_curve()
+            if roc_auc is not None:
+                self.statusBar().showMessage(f"ROC curve generated with {len(roc_auc)-1} classes")
+            else:
+                self.statusBar().showMessage("Failed to generate ROC curve: Test folder not found")
+        except Exception as e:
+            QMessageBox.warning(self, "Error", f"Failed to generate ROC curve: {str(e)}")
+            self.statusBar().showMessage("Error generating ROC curve")
 
 
 if __name__ == "__main__":

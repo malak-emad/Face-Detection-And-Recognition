@@ -1286,6 +1286,90 @@ QPushButton:pressed {
                       </property>
                      </widget>
                     </item>
+                    <item>
+                     <widget class="QPushButton" name="rocCurve_button">
+                      <property name="minimumSize">
+                       <size>
+                        <width>200</width>
+                        <height>28</height>
+                       </size>
+                      </property>
+                      <property name="maximumSize">
+                       <size>
+                        <width>100</width>
+                        <height>16777215</height>
+                       </size>
+                      </property>
+                      <property name="styleSheet">
+                       <string notr="true">QPushButton {
+    background-color: #3D61D3;  /* Same as ComboBox */
+    border-radius: 8px;
+    color: white;
+    border: 2px solid #F2F2F2;
+    padding: 6px 12px;
+    font-size: 14px;
+    font-weight: bold;
+    transition: background-color 0.3s ease-in-out;
+}
+
+/* Hover effect */
+QPushButton:hover {
+    background-color: #2C4ABF; /* Slightly darker blue */
+}
+
+/* Pressed effect */
+QPushButton:pressed {
+    background-color: #1F3A93; /* Even darker for press */
+}
+</string>
+                      </property>
+                      <property name="text">
+                       <string>ROC curve</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item>
+                     <widget class="QPushButton" name="confusionMatrix_button">
+                      <property name="minimumSize">
+                       <size>
+                        <width>200</width>
+                        <height>28</height>
+                       </size>
+                      </property>
+                      <property name="maximumSize">
+                       <size>
+                        <width>100</width>
+                        <height>16777215</height>
+                       </size>
+                      </property>
+                      <property name="styleSheet">
+                       <string notr="true">QPushButton {
+    background-color: #3D61D3;  /* Same as ComboBox */
+    border-radius: 8px;
+    color: white;
+    border: 2px solid #F2F2F2;
+    padding: 6px 12px;
+    font-size: 14px;
+    font-weight: bold;
+    transition: background-color 0.3s ease-in-out;
+}
+
+/* Hover effect */
+QPushButton:hover {
+    background-color: #2C4ABF; /* Slightly darker blue */
+}
+
+/* Pressed effect */
+QPushButton:pressed {
+    background-color: #1F3A93; /* Even darker for press */
+}
+</string>
+                      </property>
+                      <property name="text">
+                       <string>Confusion Matrix</string>
+                      </property>
+                     </widget>
+                    </item>
                    </layout>
                   </widget>
                  </item>
