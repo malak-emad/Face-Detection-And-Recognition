@@ -6,8 +6,9 @@ import numpy as np
 
 class FaceDetection:
 
-    def detect_faces(src: np.ndarray, rectangle_thickness: int = 10, scale_factor: float = 1.1, min_size: int = 50):
-        
+    def detect_faces(src: np.ndarray, Min_Neighbour: int = 10, scale_factor: float = 1.1, min_size: int = 50):
+        rectangle_thickness = 2
+
         ##detect faces in an image using Haar cascades.
         image = np.copy(src)
 
@@ -20,7 +21,7 @@ class FaceDetection:
         faces = face_cascade.detectMultiScale(
             image=image,
             scaleFactor=scale_factor,
-            minNeighbors=5,
+            minNeighbors=Min_Neighbour,
             minSize=(min_size, min_size),
             flags=cv2.CASCADE_SCALE_IMAGE
         )
@@ -29,7 +30,7 @@ class FaceDetection:
 
         return faces, result_img
 
-    def draw_faces(src: np.ndarray, faces: list, thickness: int = 10):
+    def draw_faces(src: np.ndarray, faces: list, thickness: int = 2):
         
         ##draw rectangles around detected faces.
         img = np.copy(src)

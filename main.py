@@ -75,12 +75,12 @@ class MainApp(QtWidgets.QMainWindow, ui):
             QMessageBox.warning(self, "Warning", "Please upload an image first.")
             return
         
-        rectangle_thickness = int(self.tickness_lineEdit.text())
+        Min_Neighbour = int(self.tickness_lineEdit.text())
         scale_factor = float(self.scaleFactor_lineEdit.text())
         window_size = int(self.windowSize_lineEdit.text())
         
         start = time.time()
-        faces, detected_faces = FaceDetection.detect_faces(self.image, rectangle_thickness, scale_factor, window_size)
+        faces, detected_faces = FaceDetection.detect_faces(self.image, Min_Neighbour, scale_factor, window_size)
         end = time.time()
         
         self.display_result_on_label(self.outputDetection, detected_faces)
