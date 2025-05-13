@@ -3,7 +3,7 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
-from sklearn.metrics import confusion_matrix, roc_curve, auc
+from sklearn.metrics import confusion_matrix, roc_curve, auc, roc_auc_score
 from sklearn.preprocessing import label_binarize
 from itertools import cycle
 
@@ -346,119 +346,39 @@ class FaceRecognition:
         
         return cm, all_labels
 
-    def generate_roc_curve(self, test_data_folder=None):
-        """
-        Generate and display ROC curves for face recognition performance.
-        
-        Args:
-            test_data_folder (str, optional): Path to folder containing test subject folders.
-                                            If None, will use the test folder from the current directory structure.
-        """
-        if test_data_folder is None:
-            # Try to find the test folder in the current directory structure
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            # Look for standard test data path
-            possible_test_paths = [
-                os.path.join(current_dir, 'dataset', 'MIT-CBCL-facerec-database', 'SOME DATA', 'test'),
-                os.path.join(current_dir, 'test')
-            ]
-            
-            for path in possible_test_paths:
-                if os.path.exists(path) and os.path.isdir(path):
-                    test_data_folder = path
-                    break
-                    
-            if test_data_folder is None:
-                print("Error: Could not find test data folder")
-                return None, None, None
-        
-        # Collect all test images and true labels
-        test_images = []
-        y_true = []
-        
-        # Process each subject directory in the test folder
-        for subject_dir in os.listdir(test_data_folder):
-            subject_path = os.path.join(test_data_folder, subject_dir)
-            
-            # Skip if not a directory
-            if not os.path.isdir(subject_path):
-                continue
-                
-            # Process each image in the subject's folder
-            image_files = [f for f in os.listdir(subject_path) 
-                        if f.lower().endswith(('.pgm', '.jpg', '.jpeg', '.png'))]
-                        
-            for img_file in image_files:
-                img_path = os.path.join(subject_path, img_file)
-                img = cv2.imread(img_path)
-                
-                if img is None:
-                    continue
-                    
-                # Store image and its true label (folder name)
-                test_images.append(img)
-                y_true.append(subject_dir)
-        
-        # Get unique classes
-        classes = sorted(list(set(y_true)))
-        n_classes = len(classes)
-        
-        # Binarize the labels (one-vs-rest)
-        y_true_bin = label_binarize(y_true, classes=classes)
-        
-        # Initialize array for decision scores
-        decision_scores = np.zeros((len(test_images), n_classes))
-        
-        # For each test image, get confidence scores for all classes
-        for i, image in enumerate(test_images):
-            # Get prediction for this image
-            _, results, _ = self.recognize_face(image)
-            
-            if results:
-                pred_label_num, confidence = results[0]
-                pred_subject = self.subject_names.get(pred_label_num, "Unknown")
-                
-                # Find index of predicted class in classes list
-                if pred_subject in classes:
-                    class_idx = classes.index(pred_subject)
-                    decision_scores[i, class_idx] = confidence
-        
-        # Compute ROC curve and ROC area for each class
-        fpr = dict()
-        tpr = dict()
-        roc_auc = dict()
-        
-        for i in range(n_classes):
-            fpr[i], tpr[i], _ = roc_curve(y_true_bin[:, i], decision_scores[:, i])
-            roc_auc[i] = auc(fpr[i], tpr[i])
-        
-        # Compute micro-average ROC curve and area
-        fpr["micro"], tpr["micro"], _ = roc_curve(y_true_bin.ravel(), decision_scores.ravel())
-        roc_auc["micro"] = auc(fpr["micro"], tpr["micro"])
-        
-        # Plot ROC curves
-        plt.figure(figsize=(10, 8))
-        
-        # Plot each class
-        colors = cycle(['aqua', 'darkorange', 'cornflowerblue', 'green', 'red',
-                    'purple', 'pink', 'brown', 'gray', 'olive'])
-        for i, color in zip(range(n_classes), colors):
-            plt.plot(fpr[i], tpr[i], color=color, lw=2,
-                    label=f'Class {classes[i]} (AUC = {roc_auc[i]:0.2f})')
-        
-        # Plot micro-average
-        plt.plot(fpr["micro"], tpr["micro"],
-                label=f'Micro-average (AUC = {roc_auc["micro"]:0.2f})',
-                color='deeppink', linestyle=':', linewidth=4)
-        
-        plt.plot([0, 1], [0, 1], 'k--', lw=2)
-        plt.xlim([0.0, 1.0])
-        plt.ylim([0.0, 1.05])
+    def generate_roc_curve(self, test_face_label, selected_eigenfaces=None):
+
+        if not self.model_trained or not self.eigenfaces_computed:
+            print("Model not trained or eigenfaces not computed.")
+            return
+
+        # Binary labels: 1 if match test label, 0 otherwise
+        binary_labels = [1 if self.subject_names[label] == test_face_label else 0 for label in self.training_labels]
+
+        if selected_eigenfaces is None:
+            selected_eigenfaces = list(range(min(10, self.pca.n_components_)))  # Default: first 10 eigenfaces
+
+        # Compute ROC per selected eigenface
+        plt.figure(figsize=(14, 8))
+        roc_auc_values = []
+
+        for idx in selected_eigenfaces:
+            scores = self.weights[:, idx]  # projection values as "confidence scores"
+            fpr, tpr, _ = roc_curve(binary_labels, scores)
+            auc_val = roc_auc_score(binary_labels, scores)
+            roc_auc_values.append(auc_val)
+
+            plt.plot(fpr, tpr, label=f'Eigenface {idx+1} (AUC = {auc_val:.2f})', linewidth=2)
+
+        # Plot reference line
+        plt.plot([0, 1], [0, 1], color='gray', linestyle='--')
         plt.xlabel('False Positive Rate')
         plt.ylabel('True Positive Rate')
-        plt.title('ROC Curve for Face Recognition')
+        plt.title(f'ROC Curves using PCA Projections for Class {test_face_label}')
         plt.legend(loc="lower right")
         plt.grid(True)
         plt.show()
-        
-        return fpr, tpr, roc_auc
+
+        # Print Mean AUC
+        mean_auc = np.mean(roc_auc_values)
+        print(f"Mean AUC over {len(selected_eigenfaces)} eigenfaces: {mean_auc:.3f}")

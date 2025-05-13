@@ -244,18 +244,21 @@ class MainApp(QtWidgets.QMainWindow, ui):
     def draw_roc_curve(self):
         """
         Handle ROC curve button click.
-        Automatically uses the test folder path from the current project structure
-        to generate and display ROC curves.
+        Uses fixed logic to generate ROC curve for a specific class using PCA projections.
         """
         self.statusBar().showMessage("Generating ROC curve...")
         try:
-            # Call the updated function without specifying a folder path
-            # It will auto-detect the test data folder
-            fpr, tpr, roc_auc = self.face_recognition.generate_roc_curve()
-            if roc_auc is not None:
-                self.statusBar().showMessage(f"ROC curve generated with {len(roc_auc)-1} classes")
-            else:
-                self.statusBar().showMessage("Failed to generate ROC curve: Test folder not found")
+            # Example: you might get the test_face_label from a dropdown or manually set it
+            test_face_label = "s6"  # You can make this dynamic later
+            selected_eigenfaces = [0, 5, 10, 15, 22]  # Adjust as needed
+
+            self.face_recognition.generate_roc_curve(
+                test_face_label=test_face_label,
+                selected_eigenfaces=selected_eigenfaces
+            )
+
+            self.statusBar().showMessage(f"ROC curve generated for {test_face_label}")
+
         except Exception as e:
             QMessageBox.warning(self, "Error", f"Failed to generate ROC curve: {str(e)}")
             self.statusBar().showMessage("Error generating ROC curve")
