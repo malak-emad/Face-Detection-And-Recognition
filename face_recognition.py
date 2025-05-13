@@ -6,8 +6,10 @@ from sklearn.decomposition import PCA
 from sklearn.metrics import confusion_matrix, roc_curve, auc, roc_auc_score
 from sklearn.preprocessing import label_binarize
 from itertools import cycle
-
+import seaborn as sns
 import numpy as np
+from sklearn.preprocessing import normalize
+
 
 class MyPCA:
     def __init__(self, n_components=0.95): #keeping 95% of principal components
@@ -250,135 +252,90 @@ class FaceRecognition:
         plt.tight_layout()
         plt.show()
 
-    
-    def generate_confusion_matrix(self, test_data_folder=None):
-        """
-        Generate and display a confusion matrix from test data folder.
-        
-        Args:
-            test_data_folder (str, optional): Path to folder containing test subject folders.
-                                            If None, will use the test folder from the current directory structure.
-        """
-        if test_data_folder is None:
-            # Try to find the test folder in the current directory structure
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            # Look for standard test data path
-            possible_test_paths = [
-                os.path.join(current_dir, 'dataset', 'MIT-CBCL-facerec-database', 'SOME DATA', 'test'),
-                os.path.join(current_dir, 'test')
-            ]
-            
-            for path in possible_test_paths:
-                if os.path.exists(path) and os.path.isdir(path):
-                    test_data_folder = path
-                    break
-                    
-            if test_data_folder is None:
-                print("Error: Could not find test data folder")
-                return None, None
-        
-        y_true = []  # True labels
-        y_pred = []  # Predicted labels
-        
-        # Process each subject folder in the test directory
-        for subject_dir in os.listdir(test_data_folder):
-            subject_path = os.path.join(test_data_folder, subject_dir)
-            
-            # Skip if not a directory
-            if not os.path.isdir(subject_path):
-                continue
-                
-            # Process each image in the subject folder
-            image_files = [f for f in os.listdir(subject_path) 
-                        if f.lower().endswith(('.pgm', '.jpg', '.jpeg', '.png'))]
-            
-            for img_file in image_files:
-                # Use the folder name as the true label
-                true_label = subject_dir
-                
-                img_path = os.path.join(subject_path, img_file)
-                img = cv2.imread(img_path)
-                
-                if img is None:
-                    continue
-                    
-                y_true.append(true_label)
-                
-                # Get prediction for this image
-                _, results, _ = self.recognize_face(img)
-                
-                if results:
-                    pred_label_num = results[0][0]  # Get first result's label
-                    # Map the numeric label to the subject folder name
-                    pred_subject = self.subject_names.get(pred_label_num, "Unknown")
-                    y_pred.append(pred_subject)
-                else:
-                    y_pred.append("Unknown")
-        
-        # Get all unique sorted labels
-        all_labels = sorted(list(set(y_true + y_pred)))
-        
-        # Generate confusion matrix
-        cm = confusion_matrix(y_true, y_pred, labels=all_labels)
-        
-        # Create and display the confusion matrix plot
-        fig, ax = plt.subplots(figsize=(10, 8))
-        im = ax.imshow(cm, cmap='Blues')
-        
-        # Set labels
-        ax.set_xticks(np.arange(len(all_labels)))
-        ax.set_yticks(np.arange(len(all_labels)))
-        ax.set_xticklabels(all_labels, rotation=45, ha="right")
-        ax.set_yticklabels(all_labels)
-        ax.set_xlabel('Predicted Label')
-        ax.set_ylabel('True Label')
-        
-        # Add text annotations
-        for i in range(len(all_labels)):
-            for j in range(len(all_labels)):
-                ax.text(j, i, cm[i, j], 
-                    ha="center", va="center",
-                    color="white" if cm[i, j] > cm.max()/2 else "black")
-        
-        plt.title('Confusion Matrix')
-        plt.tight_layout()
-        plt.show()
-        
-        return cm, all_labels
 
-    def generate_roc_curve(self, test_face_label, selected_eigenfaces=None):
 
+    def draw_subjectwise_combined_roc_from_test(self, test_data_folder, selected_eigenfaces=None):
         if not self.model_trained or not self.eigenfaces_computed:
             print("Model not trained or eigenfaces not computed.")
             return
 
-        # Binary labels: 1 if match test label, 0 otherwise
-        binary_labels = [1 if self.subject_names[label] == test_face_label else 0 for label in self.training_labels]
-
         if selected_eigenfaces is None:
-            selected_eigenfaces = list(range(min(10, self.pca.n_components_)))  # Default: first 10 eigenfaces
+            selected_eigenfaces = list(range(30))  
 
-        # Compute ROC per selected eigenface
-        plt.figure(figsize=(14, 8))
-        roc_auc_values = []
 
-        for idx in selected_eigenfaces:
-            scores = self.weights[:, idx]  # projection values as "confidence scores"
+        test_images = []
+        true_labels = []
+
+        for subject_dir in sorted(os.listdir(test_data_folder)):
+            subject_path = os.path.join(test_data_folder, subject_dir)
+            if not os.path.isdir(subject_path):
+                continue
+
+            for filename in os.listdir(subject_path):
+                if filename.lower().endswith(('.jpg', '.jpeg', '.png', '.pgm')):
+                    img_path = os.path.join(subject_path, filename)
+                    img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
+                    if img is None:
+                        continue
+
+                    faces = self.face_cascade.detectMultiScale(img, 1.1, 5)
+                    if len(faces) > 0:
+                        x, y, w, h = faces[0]
+                        face_img = cv2.resize(img[y:y+h, x:x+w], (100, 100))
+                    else:
+                        face_img = cv2.resize(img, (100, 100))
+
+                    test_images.append(face_img.flatten())
+                    true_labels.append(subject_dir.strip().lower())
+
+        if len(test_images) == 0:
+            print("No valid test images found.")
+            return
+
+        test_matrix = np.array(test_images)
+        projected_test_weights = self.pca.transform(test_matrix)[:, selected_eigenfaces]
+        projected_test_weights = normalize(projected_test_weights)
+
+        # Normalize training vectors
+        norm_train_weights = normalize(self.weights[:, selected_eigenfaces])
+        unique_train_labels = np.unique(self.training_labels)
+
+        # Build subject mapping
+        label_to_subject = {label: self.subject_names[label] for label in unique_train_labels}
+        for label, name in label_to_subject.items():
+            print(f"  {label} → {name}")
+
+        class_scores_per_test = []
+        for test_w in projected_test_weights:
+            class_scores = []
+            for label in unique_train_labels:
+                class_indices = np.where(self.training_labels == label)[0]
+                class_vectors = norm_train_weights[class_indices]
+                # cosine similarity = dot product of unit vectors
+                mean_score = np.dot(class_vectors, test_w).mean()
+                class_scores.append(mean_score)
+            class_scores_per_test.append(class_scores)
+
+        class_scores_per_test = np.array(class_scores_per_test)  # shape: (n_test, n_classes)
+
+        unique_classes = sorted(set(true_labels))
+
+        plt.figure(figsize=(12, 8))
+        for i, cls in enumerate(unique_classes):
+            binary_labels = [1 if label == cls else 0 for label in true_labels]
+            scores = class_scores_per_test[:, i]
+
             fpr, tpr, _ = roc_curve(binary_labels, scores)
             auc_val = roc_auc_score(binary_labels, scores)
-            roc_auc_values.append(auc_val)
 
-            plt.plot(fpr, tpr, label=f'Eigenface {idx+1} (AUC = {auc_val:.2f})', linewidth=2)
+            plt.plot(fpr, tpr, label=f'{cls} (AUC = {auc_val:.2f})', linewidth=2)
 
-        # Plot reference line
-        plt.plot([0, 1], [0, 1], color='gray', linestyle='--')
+        plt.plot([0, 1], [0, 1], 'k--', lw=2)
         plt.xlabel('False Positive Rate')
         plt.ylabel('True Positive Rate')
-        plt.title(f'ROC Curves using PCA Projections for Class {test_face_label}')
-        plt.legend(loc="lower right")
+        plt.title('Subject-wise ROC Curves (Cosine Similarity, 30 Eigenfaces)')
+        plt.legend(loc='lower right')
         plt.grid(True)
+        plt.tight_layout()
         plt.show()
-
-        # Print Mean AUC
-        mean_auc = np.mean(roc_auc_values)
-        print(f"Mean AUC over {len(selected_eigenfaces)} eigenfaces: {mean_auc:.3f}")
+            

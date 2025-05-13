@@ -39,7 +39,6 @@ class MainApp(QtWidgets.QMainWindow, ui):
         self.pushButton.clicked.connect(self.load_single_test_image)
         self.applyMethods_button.clicked.connect(self.match_faces)
         self.rocCurve_button.clicked.connect(self.draw_roc_curve)
-        self.confusionMatrix_button.clicked.connect(self.draw_confusion_matrix)
         
         self.statusBar().showMessage("Ready")
 
@@ -222,46 +221,24 @@ class MainApp(QtWidgets.QMainWindow, ui):
         else:
             QMessageBox.warning(self, "Warning", "No faces detected in the test image")
 
-    def draw_confusion_matrix(self):
-        """
-        Handle confusion matrix button click.
-        Automatically uses the test folder path from the current project structure
-        to generate and display the confusion matrix.
-        """
-        self.statusBar().showMessage("Generating confusion matrix...")
-        try:
-            # Call the updated function without specifying a folder path
-            # It will auto-detect the test data folder
-            cm, labels = self.face_recognition.generate_confusion_matrix()
-            if cm is not None:
-                self.statusBar().showMessage(f"Confusion matrix generated with {len(labels)} classes")
-            else:
-                self.statusBar().showMessage("Failed to generate confusion matrix: Test folder not found")
-        except Exception as e:
-            QMessageBox.warning(self, "Error", f"Failed to generate confusion matrix: {str(e)}")
-            self.statusBar().showMessage("Error generating confusion matrix")
+
+
 
     def draw_roc_curve(self):
-        """
-        Handle ROC curve button click.
-        Uses fixed logic to generate ROC curve for a specific class using PCA projections.
-        """
-        self.statusBar().showMessage("Generating ROC curve...")
         try:
-            # Example: you might get the test_face_label from a dropdown or manually set it
-            test_face_label = "s6"  # You can make this dynamic later
-            selected_eigenfaces = [0, 5, 10, 15, 22]  # Adjust as needed
+            test_folder = r"D:\lectures\computer vision\task 5\Face-Detection-And-Recognition\dataset\MIT-CBCL-facerec-database\SOME DATA\test"
 
-            self.face_recognition.generate_roc_curve(
-                test_face_label=test_face_label,
-                selected_eigenfaces=selected_eigenfaces
+            self.face_recognition.draw_subjectwise_combined_roc_from_test(
+                test_data_folder=test_folder,
+                selected_eigenfaces= None
             )
 
-            self.statusBar().showMessage(f"ROC curve generated for {test_face_label}")
+            self.statusBar().showMessage("ROC curve generated for all test subjects.")
 
         except Exception as e:
             QMessageBox.warning(self, "Error", f"Failed to generate ROC curve: {str(e)}")
-            self.statusBar().showMessage("Error generating ROC curve")
+            self.statusBar().showMessage("Error generating ROC curve.")
+
 
 
 if __name__ == "__main__":
